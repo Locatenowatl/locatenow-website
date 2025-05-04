@@ -32,7 +32,7 @@ export default function Calculator() {
       const isFree = freeMonths.includes(i);
       const rentDue = isFree ? 0 : Math.round(baseRent);
       const savingsAdjustment = isFree
-        ? proratedRent
+        ? Math.round(baseRent)
         : Math.round(proratedRent - baseRent);
       savingsBalance += savingsAdjustment;
       plan.push({
@@ -40,6 +40,7 @@ export default function Calculator() {
         rentDue,
         savingsAdjustment,
         savingsBalance: Math.round(savingsBalance),
+        prorated: proratedRent,
       });
     }
     return plan;
@@ -52,6 +53,20 @@ export default function Calculator() {
     setPage(1);
   };
 
+  const initialSavingsNeeded = useMemo(() => {
+    if (!leaseTerm || !baseRent || freeMonths.length === 0) return 0;
+    const firstFreeMonth = [...freeMonths].sort((a, b) => a - b)[0];
+    if (!firstFreeMonth || firstFreeMonth <= 1) return 0;
+
+    let totalSavings = 0;
+    for (let i = 1; i < firstFreeMonth; i++) {
+      if (!freeMonths.includes(i)) {
+        totalSavings += baseRent - proratedRent;
+      }
+    }
+    return Math.round(totalSavings);
+  }, [leaseTerm, baseRent, proratedRent, freeMonths]);
+
   return (
     <main className="bg-[#1A1A1A] text-white min-h-screen flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-2xl bg-gray-900 p-6 rounded-2xl shadow-lg space-y-6">
@@ -61,6 +76,14 @@ export default function Calculator() {
 
         {page === 1 && (
           <div className="space-y-4">
+            <div className="text-sm text-gray-300 space-y-2">
+              <div>
+                <strong>Who is this for?</strong> If you can afford the monthly prorated rent but not the full base rent every month, this tool helps you spread your rent evenly across your lease.
+              </div>
+              <div>
+                <strong>How it works:</strong> During free months, you'll save the difference. During full-rent months, you'll use the savings so your monthly budget feels consistent.
+              </div>
+            </div>
             <div>
               <label className="block mb-1">Base Monthly Rent ($):</label>
               <input
@@ -131,27 +154,45 @@ export default function Calculator() {
 
         {page === 3 && (
           <div className="space-y-4">
+            <div className="bg-[#2F2F2F] border border-[#B69D74] p-4 rounded-lg text-center">
+              <h3 className="text-lg font-semibold text-[#B69D74]">
+                Monthly Prorated Rent: ${proratedRent} (estimate)
+              </h3>
+              <p className="text-xs text-gray-300 mt-1">
+                Here's a breakdown to help you self-prorate — saving during free months so you always pay your estimated monthly rent.
+              </p>
+            </div>
+
+            {initialSavingsNeeded > 0 && (
+              <div className="text-center text-yellow-400 font-medium">
+                To stay on track, save <strong>${initialSavingsNeeded}</strong> before your first discount month.
+              </div>
+            )}
+
             <h3 className="text-lg font-semibold text-center">Your Monthly Budget Plan</h3>
-            <div className="grid grid-cols-4 gap-2 text-sm text-center">
+            <div className="grid grid-cols-5 gap-2 text-sm text-center">
               <div className="font-bold">Month</div>
               <div className="font-bold">Rent Due</div>
+              <div className="font-bold">Prorated Rent</div>
               <div className="font-bold">Save / Use</div>
               <div className="font-bold">Savings Balance</div>
               {savingsPlan.map((item) => (
                 <React.Fragment key={item.month}>
                   <div>{item.month}</div>
                   <div>${item.rentDue}</div>
+                  <div>${item.prorated}</div>
                   <div
                     className={item.rentDue === 0 ? "text-green-400" : "text-red-400"}
                   >
                     {item.rentDue === 0
-                      ? `+ Save $${item.savingsAdjustment}`
+                      ? `+ Save $${baseRent}`
                       : `– Use $${Math.abs(item.savingsAdjustment)}`}
                   </div>
                   <div>${item.savingsBalance}</div>
                 </React.Fragment>
               ))}
             </div>
+
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => setPage(2)}
