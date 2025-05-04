@@ -11,7 +11,6 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 
-// List of videos grouped by category
 const videos = [
   { id: "A2bV0cklQXc", category: "Chess" },
   { id: "wqWlZTHKlv0", category: "Chess" },
@@ -35,23 +34,19 @@ export function Guide({ onOpenModal }: { onOpenModal: () => void }) {
   const playersRef = useRef<Array<any | null>>([]);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
 
-  // Memoize filtered videos by category
   const filteredVideos = useMemo(
     () => videos.filter((v) => v.category === filter),
     [filter]
   );
 
-  // Track load state for each iframe
   const [loadedStates, setLoadedStates] = useState<boolean[]>(
     filteredVideos.map(() => false)
   );
 
-  // Reset load flags when category changes
   useEffect(() => {
     setLoadedStates(filteredVideos.map(() => false));
   }, [filter]);
 
-  // Pause any playing video when a new one starts
   const handlePlay = (idx: number) => {
     if (playingIndex !== null && playingIndex !== idx) {
       playersRef.current[playingIndex]?.pauseVideo();
@@ -59,7 +54,6 @@ export function Guide({ onOpenModal }: { onOpenModal: () => void }) {
     setPlayingIndex(idx);
   };
 
-  // Pause playing video on carousel change
   useEffect(() => {
     if (!carouselApi) return;
     const onSelect = () => {
@@ -78,7 +72,6 @@ export function Guide({ onOpenModal }: { onOpenModal: () => void }) {
     playerVars: { autoplay: 0, controls: 1 },
   };
 
-  // Check if all videos have loaded
   const allLoaded = loadedStates.every((l) => l);
 
   return (
@@ -140,12 +133,7 @@ export function Guide({ onOpenModal }: { onOpenModal: () => void }) {
                 {filteredVideos.map((video, idx) => (
                   <CarouselItem key={video.id} className="basis-1/3">
                     <div className="relative aspect-[9/16] w-full rounded-2xl shadow-lg overflow-hidden">
-                      {/* Skeleton overlay */}
-                      {!loadedStates[idx] && (
-                        <Skeleton className="absolute inset-0" />
-                      )}
-
-                      {/* YouTube iframe */}
+                      {!loadedStates[idx] && <Skeleton className="absolute inset-0" />}
                       <YouTube
                         videoId={video.id}
                         opts={opts}
@@ -162,8 +150,6 @@ export function Guide({ onOpenModal }: { onOpenModal: () => void }) {
                           loadedStates[idx] ? "opacity-100" : "opacity-0"
                         )}
                       />
-
-                      {/* Play overlay */}
                       <button
                         onClick={() => {
                           carouselApi?.scrollTo(idx);

@@ -6,6 +6,8 @@ import Home from "./pages/Home";
 import { Guide } from "./pages/Guide";
 import { LeadCaptureModal } from "./components/LeadCaptureModal";
 import { Toaster } from "@/components/ui/toaster";
+import Calculator from "@/pages/Calculator"; 
+
 
 // Scroll handler: smooth scroll on hash, instant jump on route change without hash
 function ScrollToHash() {
@@ -44,6 +46,10 @@ function App() {
           path="/guide"
           element={<Guide onOpenModal={() => setIsModalOpen(true)} />}
         />
+        <Route
+          path="/calculator"
+          element={<Calculator />}
+  />
       </Routes>
 
       <LeadCaptureModal open={isModalOpen} onOpenChange={setIsModalOpen} />

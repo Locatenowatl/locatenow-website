@@ -45,13 +45,21 @@ export function Navbar({ onOpenModal }: NavbarProps) {
             >
               Services
             </Link>
-
+           
             {/* About: use Link for FAQ hash */}
             <Link
               to="/#faq"
               className="text-gray-300 hover:text-[#B69D74]"
             >
               About
+            </Link>
+
+             {/* calculator */}
+             <Link
+              to="/calculator"
+              className="text-white hover:text-[#B69D74] transition px-4"
+            >
+              Calculator
             </Link>
 
             {/* Guide: client-side route to Guide page */}
