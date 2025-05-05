@@ -24,10 +24,36 @@ export default function Calculator() {
     );
   };
 
+  const initialSavingsNeeded = useMemo(() => {
+    if (!leaseTerm || !baseRent || freeMonths.length === 0) return 0;
+    const firstFreeMonth = [...freeMonths].sort((a, b) => a - b)[0];
+    if (!firstFreeMonth || firstFreeMonth <= 1) return 0;
+
+    let totalSavings = 0;
+    for (let i = 1; i < firstFreeMonth; i++) {
+      if (!freeMonths.includes(i)) {
+        totalSavings += baseRent - proratedRent;
+      }
+    }
+    return Math.round(totalSavings);
+  }, [leaseTerm, baseRent, proratedRent, freeMonths]);
+
   const savingsPlan = useMemo(() => {
     if (!leaseTerm || !baseRent || freeMonths.length === 0) return [];
     const plan = [];
     let savingsBalance = 0;
+
+    if (initialSavingsNeeded > 0) {
+      savingsBalance += initialSavingsNeeded;
+      plan.push({
+        month: 0,
+        rentDue: 0,
+        prorated: 0,
+        savingsAdjustment: initialSavingsNeeded,
+        savingsBalance,
+      });
+    }
+
     for (let i = 1; i <= leaseTerm; i++) {
       const isFree = freeMonths.includes(i);
       const rentDue = isFree ? 0 : Math.round(baseRent);
@@ -44,7 +70,7 @@ export default function Calculator() {
       });
     }
     return plan;
-  }, [leaseTerm, baseRent, proratedRent, freeMonths]);
+  }, [leaseTerm, baseRent, proratedRent, freeMonths, initialSavingsNeeded]);
 
   const resetCalculator = () => {
     setLeaseTermInput("");
@@ -52,20 +78,6 @@ export default function Calculator() {
     setFreeMonths([]);
     setPage(1);
   };
-
-  const initialSavingsNeeded = useMemo(() => {
-    if (!leaseTerm || !baseRent || freeMonths.length === 0) return 0;
-    const firstFreeMonth = [...freeMonths].sort((a, b) => a - b)[0];
-    if (!firstFreeMonth || firstFreeMonth <= 1) return 0;
-
-    let totalSavings = 0;
-    for (let i = 1; i < firstFreeMonth; i++) {
-      if (!freeMonths.includes(i)) {
-        totalSavings += baseRent - proratedRent;
-      }
-    }
-    return Math.round(totalSavings);
-  }, [leaseTerm, baseRent, proratedRent, freeMonths]);
 
   return (
     <main className="bg-[#1A1A1A] text-white min-h-screen flex items-center justify-center px-4 py-12">
@@ -137,18 +149,26 @@ export default function Calculator() {
                 Estimated Prorated Rent: <strong>${proratedRent}</strong>
               </div>
             )}
-            <button
-              onClick={() => setPage(3)}
-              disabled={freeMonths.length === 0}
-              className={cn(
-                "w-full mt-4 px-4 py-2 rounded",
-                freeMonths.length > 0
-                  ? "bg-[#B69D74] text-white"
-                  : "bg-gray-600 text-gray-400 cursor-not-allowed"
-              )}
-            >
-              View Budget Plan
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(1)}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded"
+              >
+                Back
+              </button>
+              <button
+                onClick={() => setPage(3)}
+                disabled={freeMonths.length === 0}
+                className={cn(
+                  "w-full px-4 py-2 rounded",
+                  freeMonths.length > 0
+                    ? "bg-[#B69D74] text-white"
+                    : "bg-gray-600 text-gray-400 cursor-not-allowed"
+                )}
+              >
+                View Budget Plan
+              </button>
+            </div>
           </div>
         )}
 
@@ -159,15 +179,29 @@ export default function Calculator() {
                 Monthly Prorated Rent: ${proratedRent} (estimate)
               </h3>
               <p className="text-xs text-gray-300 mt-1">
-                Here's a breakdown to help you self-prorate — saving during free months so you always pay your estimated monthly rent.
+                Here's a breakdown to help you self-prorate — use this budget to afford the prorated monthly rent.
               </p>
+              <p className="text-xs text-gray-400 mt-2">Months Free:</p>
+              {leaseTerm && (
+                <div className="relative w-full h-6 bg-gray-700 rounded-full overflow-hidden">
+                  {Array.from({ length: leaseTerm }, (_, i) => i + 1).map((month) => {
+                    const isFree = freeMonths.includes(month);
+                    return (
+                      <div
+                        key={month}
+                        title={`Month ${month}: ${isFree ? "Free" : "Full Rent"}`}
+                        className={`h-full float-left text-[10px] text-center leading-6 font-semibold ${
+                          isFree ? "bg-[#B69D74] text-white" : "bg-gray-500 text-black"
+                        }`}
+                        style={{ width: `${100 / leaseTerm}%` }}
+                      >
+                        {month}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-
-            {initialSavingsNeeded > 0 && (
-              <div className="text-center text-yellow-400 font-medium">
-                To stay on track, save <strong>${initialSavingsNeeded}</strong> before your first discount month.
-              </div>
-            )}
 
             <h3 className="text-lg font-semibold text-center">Your Monthly Budget Plan</h3>
             <div className="grid grid-cols-5 gap-2 text-sm text-center">
@@ -181,11 +215,9 @@ export default function Calculator() {
                   <div>{item.month}</div>
                   <div>${item.rentDue}</div>
                   <div>${item.prorated}</div>
-                  <div
-                    className={item.rentDue === 0 ? "text-green-400" : "text-red-400"}
-                  >
+                  <div className={item.rentDue === 0 ? "text-green-400" : "text-red-400"}>
                     {item.rentDue === 0
-                      ? `+ Save $${baseRent}`
+                      ? `+ Save $${item.savingsAdjustment}`
                       : `– Use $${Math.abs(item.savingsAdjustment)}`}
                   </div>
                   <div>${item.savingsBalance}</div>
