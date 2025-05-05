@@ -222,7 +222,12 @@ export default function Calculator() {
         Use this breakdown to budget: save during free months, draw during paid months.
       </p>
     </div>
-
+    <div
+          role="alert"
+          className="p-3 bg-[#FFD700] bg-opacity-20 border-l-4 border-[#FFD700] rounded-md flex items-center justify-center text-[#FFD700] font-bold text-lg"
+        >
+          Initial savings required: ${seed}
+        </div>
     {/* Chart */}
     <div className="bg-[#2F2F2F] p-4 rounded-lg">
       <ResponsiveContainer width="100%" height={250}>
@@ -267,6 +272,7 @@ export default function Calculator() {
     {/* Free‑months editor */}
     {leaseTerm && (
       <div className="flex flex-col space-y-4">
+       
         <div className="text-sm font-medium text-gray-300 text-center">
           Select Free Months
         </div>
@@ -290,12 +296,7 @@ export default function Calculator() {
             );
           })}
         </div>
-        <div
-          role="alert"
-          className="p-3 bg-[#FFD700] bg-opacity-20 border-l-4 border-[#FFD700] rounded-md flex items-center justify-center text-[#FFD700] font-bold text-lg"
-        >
-          Initial savings required: ${seed}
-        </div>
+        
       </div>
     )}
     {/* Breakdown Button */}
