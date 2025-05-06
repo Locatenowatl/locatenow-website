@@ -1,19 +1,33 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
-// Custom tooltip to label month 0 as "Initial Savings"
+// Custom tooltip to show month, reserve, and rent/free info
+type TooltipPayload = { dataKey: string; value: number };
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
-    const raw = payload[0];
-    const val = raw.payload?.balance ?? raw.value;
-    const isInitial = label === 0;
+    const rentPayload = (payload as TooltipPayload[]).find(p => p.dataKey === 'rentDue');
+    const balancePayload = (payload as TooltipPayload[]).find(p => p.dataKey === 'balance');
     return (
       <div className="bg-white p-2 rounded shadow text-black">
-        <p className="text-sm font-semibold">
-          {isInitial ? "Initial Savings" : `Month ${label}`}
-        </p>
-        <p className="text-sm">${val}</p>
+        <p className="text-sm font-semibold">Month {label}</p>
+        {balancePayload && (
+          <p className="text-sm">Reserve: ${balancePayload.value}</p>
+        )}
+        {rentPayload && (
+          <p className="text-sm">
+            {rentPayload.value > 0 ? `Rent Due: $${rentPayload.value}` : 'Free Month'}
+          </p>
+        )}
       </div>
     );
   }
@@ -26,17 +40,16 @@ export default function Calculator() {
   const [page, setPage] = useState<1 | 2 | 3>(1);
   const [freeMonths, setFreeMonths] = useState<number[]>([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
- 
-  const [showRentLine,   setShowRentLine  ] = useState(true);
-  const [showTargetLine, setShowTargetLine] = useState(false);
-  const [showDeltaLine,  setShowDeltaLine ] = useState(false);
 
-  const [viewFreeMonths, setViewFreeMonths] = useState(true);
+  // Default rent bars off
+  const [showRentLine, setShowRentLine] = useState(false);
+
   const leaseTermRef = useRef<HTMLInputElement>(null);
 
   const leaseTerm = parseInt(leaseTermInput, 10);
   const baseRent = parseFloat(baseRentInput);
 
+  // Handle pressing Enter to move from page 1 to 2
   useEffect(() => {
     const handleEnter = (e: KeyboardEvent) => {
       if (e.key === "Enter" && page === 1 && leaseTerm && baseRent) {
@@ -47,22 +60,18 @@ export default function Calculator() {
     return () => document.removeEventListener("keydown", handleEnter);
   }, [leaseTerm, baseRent, page]);
 
-  // steady monthly target P
+  // Calculate the steady monthly target
   const steadyRent = useMemo(() => {
     if (!leaseTerm || !baseRent) return 0;
     const paidMonths = leaseTerm - freeMonths.length;
-    return paidMonths > 0
-      ? Math.round((baseRent * paidMonths) / leaseTerm)
-      : 0;
+    return paidMonths > 0 ? Math.round((baseRent * paidMonths) / leaseTerm) : 0;
   }, [leaseTerm, baseRent, freeMonths]);
-  
 
-  // build plan with deltas and running balance, include month 0 seed
+  // Build the budget plan and compute the initial seed
   const { plan: budgetPlan, seed } = useMemo(() => {
     if (!leaseTerm || !baseRent) return { plan: [], seed: 0 };
-    
 
-    // compute raw deltas for each month
+    // Compute month-by-month deltas
     const deltas = Array.from({ length: leaseTerm }, (_, i) => {
       const m = i + 1;
       const isFree = freeMonths.includes(m);
@@ -70,7 +79,7 @@ export default function Calculator() {
       return { month: m, isFree, delta };
     });
 
-    // determine initial seed by finding minimum running balance starting from 0
+    // Find minimum running balance to determine seed
     let running = 0;
     let minRunning = 0;
     for (const d of deltas) {
@@ -79,11 +88,9 @@ export default function Calculator() {
     }
     const seed = minRunning < 0 ? -minRunning : 0;
 
-    // build final plan including month 0 and correct running balances starting from seed
-    const plan = [];
-    if (seed > 0) {
-      plan.push({ month: 0, isFree: false, delta: seed, balance: seed });
-    }
+    // Assemble plan including an optional month 0 seed
+    const plan: any[] = [];
+    if (seed > 0) plan.push({ month: 0, isFree: false, delta: seed, balance: seed });
     let balance = seed;
     for (const d of deltas) {
       balance += d.delta;
@@ -93,14 +100,18 @@ export default function Calculator() {
     return { plan, seed };
   }, [leaseTerm, baseRent, freeMonths, steadyRent]);
 
-  const chartData = useMemo(() =>
-    budgetPlan.map(item => ({
-      month: item.month,
-      balance: item.balance,
-      rentDue: item.month === 0 ? 0 : item.isFree ? 0 : baseRent,
-      target: item.month === 0 ? 0 : steadyRent,
-      delta: item.delta,
-    })),
+  // Prepare data for charting (exclude month 0)
+  const chartData = useMemo(
+    () =>
+      budgetPlan
+        .filter(item => item.month > 0)
+        .map(item => ({
+          month: item.month,
+          balance: item.balance,
+          rentDue: item.isFree ? 0 : baseRent,
+          target: steadyRent,
+          delta: item.delta,
+        })),
     [budgetPlan, baseRent, steadyRent]
   );
 
@@ -110,7 +121,7 @@ export default function Calculator() {
     setFreeMonths([]);
     setPage(1);
     setShowBreakdown(false);
-    setViewFreeMonths(true);
+    setShowRentLine(false);
   };
 
   const handleToggleMonth = (month: number) => {
@@ -126,6 +137,7 @@ export default function Calculator() {
           Proration Budgeting Calculator
         </h1>
 
+        {/* Page 1: Inputs */}
         {page === 1 && (
           <div className="space-y-4">
             <div className="text-sm text-gray-300 space-y-2">
@@ -166,6 +178,7 @@ export default function Calculator() {
           </div>
         )}
 
+        {/* Page 2: Select Free Months */}
         {page === 2 && (
           <div className="space-y-4">
             <p className="text-center">Select which months are free within your lease:</p>
@@ -212,22 +225,64 @@ export default function Calculator() {
         )}
 
 {page === 3 && (
-  <div className="space-y-4">
-    {/* Summary Box */}
-    <div className="bg-[#2F2F2F] border border-[#B69D74] p-4 rounded-lg text-center">
-      <h3 className="text-lg font-semibold text-[#B69D74]">
-        Steady Monthly Target: ${steadyRent}
-      </h3>
-      <p className="text-xs text-gray-300 mt-1">
-        Use this breakdown to budget: save during free months, draw during paid months.
-      </p>
-    </div>
-    <div
-          role="alert"
-          className="p-3 bg-[#FFD700] bg-opacity-20 border-l-4 border-[#FFD700] rounded-md flex items-center justify-center text-[#FFD700] font-bold text-lg"
-        >
-          Initial savings required: ${seed}
+  <div className="space-y-6">
+    {/* Info & Initial Savings Box */}
+    <div className="bg-[#2F2F2F] p-6 rounded-2xl shadow-lg space-y-6">
+      {/* Initial Savings Card */}
+      <div className="bg-[#FFffff] p-4 rounded-xl shadow-md text-black font-bold text-center text-xl">
+        Initial Savings Required: ${seed}
+      </div>
+
+      {/* Inputs & Free-Months Selector */}
+      <div className="grid grid-cols-1 gap-4">
+        <div>
+          <label className="block mb-1 text-sm text-gray-300">Base Monthly Rent ($)</label>
+          <input
+            type="text"
+            value={baseRentInput}
+            onChange={e => setBaseRentInput(e.target.value)}
+            placeholder="e.g. 2350"
+            className="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-[#B69D74]"
+          />
         </div>
+        <div>
+          <label className="block mb-1 text-sm text-gray-300">Lease Term (months)</label>
+          <input
+            type="text"
+            value={leaseTermInput}
+            onChange={e => setLeaseTermInput(e.target.value)}
+            placeholder="e.g. 14"
+            className="w-full px-3 py-2 rounded bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-[#B69D74]"
+          />
+        </div>
+        <div>
+          <label className="block mb-1 text-sm text-gray-300">Select Free Months</label>
+          <div className="relative h-10 bg-gray-700 rounded-full overflow-hidden">
+            {Array.from({ length: leaseTerm }, (_, i) => i + 1).map(month => {
+              const isFree = freeMonths.includes(month);
+              return (
+                <div
+                  key={month}
+                  onClick={() => handleToggleMonth(month)}
+                  className={`
+                    absolute top-0 h-full text-xs font-semibold flex items-center justify-center
+                    cursor-pointer transition-all
+                    ${isFree ? "bg-[#B69D74] text-white" : "text-gray-500"}
+                  `}
+                  style={{
+                    left: `${((month - 1) / leaseTerm) * 100}%`,
+                    width: `${100 / leaseTerm}%`
+                  }}
+                >
+                  {month}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+
     {/* Chart */}
     <div className="bg-[#2F2F2F] p-4 rounded-lg">
       <ResponsiveContainer width="100%" height={250}>
@@ -236,11 +291,12 @@ export default function Calculator() {
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="month" />
+          <XAxis
+            dataKey="month"
+            tickFormatter={tick => (tick === 0 ? "Initial Savings" : tick)}
+          />
           <YAxis />
           <Tooltip content={<CustomTooltip />} />
-
-          {/* Reserve (main) line */}
           <Line
             type="monotone"
             dataKey="balance"
@@ -248,8 +304,6 @@ export default function Calculator() {
             strokeWidth={2}
             dot={false}
           />
-
-          {/* Rent due as bars, toggled */}
           {showRentLine && (
             <Bar dataKey="rentDue" barSize={20} fillOpacity={0.3} fill="#4A90E2" />
           )}
@@ -257,96 +311,87 @@ export default function Calculator() {
       </ResponsiveContainer>
     </div>
 
-    {/* Toggle control */}
-    <div className="flex items-center gap-2 text-sm mb-4">
+    {/* Toggle Rent Bars */}
+    <div className="flex items-center gap-2 text-sm">
       <label className="flex items-center gap-1">
         <input
           type="checkbox"
           checked={showRentLine}
           onChange={() => setShowRentLine(r => !r)}
+          className="accent-[#B69D74]"
         />
         Show Rent Due Bars
       </label>
     </div>
 
-    {/* Free‑months editor */}
-    {leaseTerm && (
-      <div className="flex flex-col space-y-4">
-       
-        <div className="text-sm font-medium text-gray-300 text-center">
-          Select Free Months
-        </div>
-        <div className="relative h-10 bg-gray-700 rounded-full overflow-hidden">
-          {Array.from({ length: leaseTerm }, (_, i) => i + 1).map(month => {
-            const isFree = freeMonths.includes(month);
-            return (
-              <div
-                key={month}
-                onClick={() => handleToggleMonth(month)}
-                className={`absolute top-0 h-full text-xs font-semibold flex items-center justify-center cursor-pointer transition-all ${
-                  isFree ? "bg-[#B69D74] text-white" : "text-gray-500"
-                }`}
-                style={{
-                  left: `${((month - 1) / leaseTerm) * 100}%`,
-                  width: `${100 / leaseTerm}%`,
-                }}
-              >
-                {month}
+    {/* Breakdown Toggle */}
+    <button
+      onClick={() => setShowBreakdown(b => !b)}
+      className="w-full px-4 py-2 bg-[#B69D74] text-white font-semibold rounded-lg shadow"
+    >
+      {showBreakdown ? "Hide" : "Show"} Monthly Budget Breakdown
+    </button>
+
+    {/* Monthly Budget Breakdown */}
+    {showBreakdown && (
+      <div className="grid grid-cols-5 gap-2 text-sm text-center">
+        {/* Headers */}
+        <div className="font-bold">Month</div>
+        <div className="font-bold">Rent Due</div>
+        <div className="font-bold">Steady Target</div>
+        <div className="font-bold">Save/Use</div>
+        <div className="font-bold">Reserve</div>
+
+        {/* Initial Savings row */}
+        <React.Fragment key="initial">
+          <div>Initial Savings</div>
+          <div>$0</div>
+          <div>$0</div>
+          <div className="text-green-400">+{seed}</div>
+          <div>${seed}</div>
+        </React.Fragment>
+
+        {/* Months 1–N */}
+        {budgetPlan
+          .filter(item => item.month > 0)
+          .map(item => (
+            <React.Fragment key={item.month}>
+              <div>{item.month}</div>
+              <div>${item.isFree ? 0 : baseRent}</div>
+              <div>${steadyRent}</div>
+              <div className={item.delta > 0 ? "text-green-400" : "text-red-400"}>
+                {item.delta > 0 ? `+${item.delta}` : `${item.delta}`}
               </div>
-            );
-          })}
-        </div>
-        
+              <div>${item.balance}</div>
+            </React.Fragment>
+          ))}
+
+        {/* Phantom Final Adjustment */}
+        <React.Fragment key="final">
+          <div className="italic">Final Reserve</div>
+          <div className="col-span-3" />
+          <div className="text-green-400">${seed}</div>
+        </React.Fragment>
       </div>
     )}
-    {/* Breakdown Button */}
-<button
-  onClick={() => setShowBreakdown(prev => !prev)}
-  className="w-full px-4 py-2 bg-[#B69D74] text-white font-semibold rounded"
->
-  {showBreakdown ? "Hide" : "Show"} Monthly Budget Breakdown
-</button>
-
-{/* Monthly Budget Breakdown */}
-{showBreakdown && (
-  <div className="grid grid-cols-5 gap-2 text-sm text-center">
-    <div className="font-bold">Month</div>
-    <div className="font-bold">Rent Due</div>
-    <div className="font-bold">Steady Target</div>
-    <div className="font-bold">Save/Use</div>
-    <div className="font-bold">Reserve</div>
-    {budgetPlan.map(item => (
-      <React.Fragment key={item.month}>
-        <div>{item.month}</div>
-        <div>${item.month === 0 ? 0 : item.isFree ? 0 : baseRent}</div>
-        <div>${item.month === 0 ? 0 : steadyRent}</div>
-        <div className={item.delta > 0 ? "text-green-400" : "text-red-400"}>
-          {item.delta > 0 ? `+${item.delta}` : `${item.delta}`}
-        </div>
-        <div>${item.balance}</div>
-      </React.Fragment>
-    ))}
-  </div>
-)}
 
     {/* Navigation Buttons */}
     <div className="flex gap-2">
       <button
         onClick={() => setPage(2)}
-        className="flex-1 bg-gray-600 py-2 rounded text-white"
+        className="flex-1 bg-gray-600 py-2 rounded-lg text-white shadow"
       >
         Back
       </button>
       <button
         onClick={resetCalculator}
-        className="flex-1 bg-red-600 py-2 rounded text-white"
+        className="flex-1 bg-red-600 py-2 rounded-lg text-white shadow"
       >
-        Reset Calculator
+        Reset
       </button>
     </div>
   </div>
 )}
-
       </div>
     </main>
   );
