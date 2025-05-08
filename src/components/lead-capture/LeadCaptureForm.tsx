@@ -6,10 +6,11 @@ import { Progress } from '@/components/ui/progress';
 import { BudgetStep } from './steps/BudgetStep';
 import { MoveInDateStep } from './steps/MoveInDateStep';
 import { AmenitiesStep } from './steps/AmenitiesStep';
+import CreditStep from './steps/CreditStep';
 import { ContactInfoStep } from './steps/ContactInfoStep';
 import { FormData } from './types';
 
-const STEPS = ['size', 'budget', 'moveIn', 'amenities', 'contact'] as const;
+const STEPS = ['size', 'budget', 'moveIn', 'amenities', 'credit', 'contact'] as const;
 type StepKey = typeof STEPS[number];
 
 interface LeadCaptureFormProps {
@@ -22,8 +23,11 @@ export function LeadCaptureForm({ onClose }: LeadCaptureFormProps) {
   const [formData, setFormData] = useState<FormData>({
     size: [] as SizeOption[],
     budget: '',
-    moveInDate: ['', ''],
+    moveInDate: '',
     amenities: [],
+    creditStatus: '',
+    backgroundIssues: [],
+    employmentStatus: '',
     name: '',
     email: '',
     phone: '',
@@ -45,7 +49,9 @@ export function LeadCaptureForm({ onClose }: LeadCaptureFormProps) {
   };
 
   const handleBack = () => {
-    if (currentIndex > 0) setCurrentStep(STEPS[currentIndex - 1]);
+    if (currentIndex > 0) {
+      setCurrentStep(STEPS[currentIndex - 1]);
+    }
   };
 
   const handleComplete = () => {
@@ -55,15 +61,14 @@ export function LeadCaptureForm({ onClose }: LeadCaptureFormProps) {
 
   return (
     <div className="space-y-6 px-6 pb-6">
-      {/* Progress bar */}
       <Progress value={progressPercent} className="mb-6" />
 
       {currentStep === 'size' && (
         <ApartmentSizeStep
           value={formData.size}
-          onChange={sizes => updateFormData({ size: sizes })}
+          onChange={sizes => handleNext({ size: sizes })}
           onBack={handleBack}
-          onNext={(sizes: SizeOption[]) => handleNext({ size: sizes })}
+          onNext={sizes => handleNext({ size: sizes })}
         />
       )}
 
@@ -80,7 +85,7 @@ export function LeadCaptureForm({ onClose }: LeadCaptureFormProps) {
       {currentStep === 'moveIn' && (
         <MoveInDateStep
           value={formData.moveInDate}
-          onChange={moveInDate => updateFormData({ moveInDate })}
+          onChange={date => handleNext({ moveInDate: date })}
           onBack={handleBack}
           onNext={() => handleNext({ moveInDate: formData.moveInDate })}
         />
@@ -89,9 +94,26 @@ export function LeadCaptureForm({ onClose }: LeadCaptureFormProps) {
       {currentStep === 'amenities' && (
         <AmenitiesStep
           selectedAmenities={formData.amenities}
-          onChange={amenities => updateFormData({ amenities })}
+          onChange={amenities => handleNext({ amenities })}
           onBack={handleBack}
           onNext={() => handleNext({ amenities: formData.amenities })}
+        />
+      )}
+
+      {currentStep === 'credit' && (
+        <CreditStep
+          creditStatus={formData.creditStatus}
+          backgroundIssues={formData.backgroundIssues}
+          employmentStatus={formData.employmentStatus}
+          onChange={data => updateFormData(data)}
+          onBack={handleBack}
+          onNext={() =>
+            handleNext({
+              creditStatus: formData.creditStatus,
+              backgroundIssues: formData.backgroundIssues,
+              employmentStatus: formData.employmentStatus,
+            })
+          }
         />
       )}
 
